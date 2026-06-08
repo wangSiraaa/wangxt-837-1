@@ -47,3 +47,21 @@ INSERT INTO bunkering_apply (id, apply_no, ship_code, ship_name, agent_code, age
 -- 窗口冲突：计划时间 2024-06-11 08:00-12:00 与靠泊计划 PLAN004 冲突
 INSERT INTO bunkering_apply (id, apply_no, ship_code, ship_name, agent_code, agent_name, supplier_code, supplier_name, oil_batch_id, oil_type, oil_quantity, berth_code, work_window_id, plan_start_time, plan_end_time, cert_review_status, cert_review_comment, cert_review_time, cert_reviewer, apply_status, reject_reason, confirm_time, sulfur_check_result, window_conflict_flag, create_by, update_by) VALUES
 ('APPLY004', 'BA202406004', 'SHIP003', '致远号', 'AGENT001', '上海外轮代理有限公司', 'SUPP001', '中石化燃料油销售有限公司', 'BATCH001', '燃料油', 200.00, 'BERTH001', 'WIN006', '2024-06-11 08:00:00', '2024-06-11 12:00:00', 1, '证书有效，复核通过', '2024-06-10 10:00:00', 'reviewer001', 3, NULL, NULL, 1, 0, 'admin', 'admin');
+
+-- APPLY005: 已确认(5)，状态正常，油品合格，窗口无冲突，用于签收成功测试
+INSERT INTO bunkering_apply (id, apply_no, ship_code, ship_name, agent_code, agent_name, supplier_code, supplier_name, oil_batch_id, oil_type, oil_quantity, berth_code, work_window_id, plan_start_time, plan_end_time, cert_review_status, cert_review_comment, cert_review_time, cert_reviewer, apply_status, reject_reason, confirm_time, sulfur_check_result, window_conflict_flag, create_by, update_by) VALUES
+('APPLY005', 'BA202406005', 'SHIP001', '远洋号', 'AGENT001', '上海外轮代理有限公司', 'SUPP001', '中石化燃料油销售有限公司', 'BATCH001', '燃料油', 500.00, 'BERTH001', 'WIN001', '2024-06-10 08:00:00', '2024-06-10 12:00:00', 1, '证书有效，复核通过', '2024-06-09 10:00:00', 'reviewer001', 5, NULL, '2024-06-09 14:00:00', 1, 0, 'admin', 'admin');
+
+-- APPLY006: 已确认(5)，油品BATCH003硫含量超标(0.85%)，用于签收时硫含量超标拒绝测试
+INSERT INTO bunkering_apply (id, apply_no, ship_code, ship_name, agent_code, agent_name, supplier_code, supplier_name, oil_batch_id, oil_type, oil_quantity, berth_code, work_window_id, plan_start_time, plan_end_time, cert_review_status, cert_review_comment, cert_review_time, cert_reviewer, apply_status, reject_reason, confirm_time, sulfur_check_result, window_conflict_flag, create_by, update_by) VALUES
+('APPLY006', 'BA202406006', 'SHIP001', '远洋号', 'AGENT001', '上海外轮代理有限公司', 'SUPP002', '某地方炼油厂', 'BATCH003', '燃料油', 300.00, 'BERTH002', 'WIN004', '2024-06-10 08:00:00', '2024-06-10 12:00:00', 1, '证书有效，复核通过', '2024-06-09 11:00:00', 'reviewer001', 5, NULL, '2024-06-09 15:00:00', 2, 0, 'admin', 'admin');
+
+-- APPLY007: 已确认(5)，窗口冲突，用于签收时靠泊计划冲突拒绝测试
+-- 窗口冲突：计划时间 2024-06-11 08:00-12:00 与靠泊计划 PLAN004 冲突
+INSERT INTO bunkering_apply (id, apply_no, ship_code, ship_name, agent_code, agent_name, supplier_code, supplier_name, oil_batch_id, oil_type, oil_quantity, berth_code, work_window_id, plan_start_time, plan_end_time, cert_review_status, cert_review_comment, cert_review_time, cert_reviewer, apply_status, reject_reason, confirm_time, sulfur_check_result, window_conflict_flag, create_by, update_by) VALUES
+('APPLY007', 'BA202406007', 'SHIP003', '致远号', 'AGENT001', '上海外轮代理有限公司', 'SUPP001', '中石化燃料油销售有限公司', 'BATCH001', '燃料油', 200.00, 'BERTH001', 'WIN006', '2024-06-11 08:00:00', '2024-06-11 12:00:00', 1, '证书有效，复核通过', '2024-06-10 10:00:00', 'reviewer001', 5, NULL, '2024-06-10 14:00:00', 1, 0, 'admin', 'admin');
+
+-- 签收单测试数据
+-- SIGN001: APPLY005的成功签收记录
+INSERT INTO sign_receipt (id, receipt_no, apply_id, apply_no, ship_code, ship_name, supplier_code, supplier_name, actual_quantity, sign_time, signer, before_status, after_status, cert_check_result, cert_check_msg, oil_check_result, oil_check_msg, window_check_result, window_check_msg, receipt_status, reject_reason, remark, create_by, update_by) VALUES
+('SIGN001', 'SR20240610001', 'APPLY005', 'BA202406005', 'SHIP001', '远洋号', 'SUPP001', '中石化燃料油销售有限公司', 498.50, '2024-06-10 11:30:00', '张三', 5, 10, 1, '船舶证书校验通过，所有证书在有效期内', 1, '油品硫含量合格。批次号: FUEL20240601，硫含量: 0.35%，限值: 0.5%', 1, '作业窗口校验通过，无冲突', 1, NULL, '加注作业完成，实际量与计划量略有差异', 'supplier001', 'supplier001');

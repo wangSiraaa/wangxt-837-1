@@ -128,3 +128,39 @@ CREATE INDEX idx_apply_ship ON bunkering_apply(ship_code);
 CREATE INDEX idx_apply_status ON bunkering_apply(apply_status);
 CREATE INDEX idx_apply_supplier ON bunkering_apply(supplier_code);
 CREATE INDEX idx_apply_cert_status ON bunkering_apply(cert_review_status);
+
+-- 签收单表
+CREATE TABLE IF NOT EXISTS sign_receipt (
+    id VARCHAR(36) NOT NULL PRIMARY KEY COMMENT '主键',
+    receipt_no VARCHAR(50) NOT NULL UNIQUE COMMENT '签收单号',
+    apply_id VARCHAR(36) NOT NULL COMMENT '加注申请ID',
+    apply_no VARCHAR(50) NOT NULL COMMENT '申请单号',
+    ship_code VARCHAR(50) NOT NULL COMMENT '船舶编号',
+    ship_name VARCHAR(100) NOT NULL COMMENT '船舶名称',
+    supplier_code VARCHAR(50) NOT NULL COMMENT '供油企业编号',
+    supplier_name VARCHAR(100) NOT NULL COMMENT '供油企业名称',
+    actual_quantity DECIMAL(12,2) NOT NULL COMMENT '实际加注量(吨)',
+    sign_time TIMESTAMP NOT NULL COMMENT '签收时间',
+    signer VARCHAR(50) NOT NULL COMMENT '签收人',
+    before_status INT NOT NULL COMMENT '签收前状态',
+    after_status INT NOT NULL COMMENT '签收后状态',
+    cert_check_result INT DEFAULT 0 COMMENT '证书核对结果 0-未核对 1-核对通过 2-核对不通过',
+    cert_check_msg VARCHAR(500) COMMENT '证书核对说明',
+    oil_check_result INT DEFAULT 0 COMMENT '油品核对结果 0-未核对 1-核对通过 2-核对不通过',
+    oil_check_msg VARCHAR(500) COMMENT '油品核对说明',
+    window_check_result INT DEFAULT 0 COMMENT '窗口核对结果 0-未核对 1-核对通过 2-核对不通过',
+    window_check_msg VARCHAR(500) COMMENT '窗口核对说明',
+    receipt_status INT DEFAULT 0 COMMENT '签收状态 0-待审核 1-审核通过 2-审核不通过',
+    reject_reason VARCHAR(500) COMMENT '拒绝原因',
+    remark VARCHAR(500) COMMENT '备注',
+    deleted INT DEFAULT 0 COMMENT '逻辑删除',
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    create_by VARCHAR(50) COMMENT '创建人',
+    update_by VARCHAR(50) COMMENT '更新人'
+);
+
+CREATE INDEX idx_sign_apply ON sign_receipt(apply_id);
+CREATE INDEX idx_sign_status ON sign_receipt(receipt_status);
+CREATE INDEX idx_sign_ship ON sign_receipt(ship_code);
+CREATE INDEX idx_sign_supplier ON sign_receipt(supplier_code);

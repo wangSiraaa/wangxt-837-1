@@ -33,27 +33,31 @@ src/main/java/com/maritime/bunkering/
 │   └── MybatisPlusConfig.java              # MyBatis Plus 配置
 ├── controller/                              # API 控制层
 │   ├── BunkeringAgentController.java       # 船舶代理接口
-│   ├── OilSupplierController.java          # 供油企业接口
-│   ├── PortAuthorityController.java        # 港航监管接口
+│   ├── OilSupplierController.java          # 供油企业接口（含签收提交）
+│   ├── PortAuthorityController.java        # 港航监管接口（含签收核对）
 │   └── BaseDataController.java             # 基础数据接口
 ├── dto/                                     # 数据传输对象
 │   ├── BunkeringApplySubmitDTO.java        # 加注申请提交参数
-│   └── CertReviewDTO.java                  # 证书复核参数
+│   ├── CertReviewDTO.java                  # 证书复核参数
+│   ├── SignReceiptSubmitDTO.java           # 签收单提交参数
+│   └── SignCheckResultVO.java              # 签收核对结果返回
 ├── entity/                                  # 实体类
 │   ├── ShipCert.java                       # 船舶证书
 │   ├── OilBatch.java                       # 油品批次
 │   ├── WorkWindow.java                     # 作业窗口
 │   ├── BerthPlan.java                      # 靠泊计划
-│   └── BunkeringApply.java                 # 加注申请
+│   ├── BunkeringApply.java                 # 加注申请
+│   └── SignReceipt.java                    # 签收单（新增）
 ├── enums/                                   # 枚举类
-│   ├── ApplyStatusEnum.java                # 申请状态枚举
+│   ├── ApplyStatusEnum.java                # 申请状态枚举（含签收状态）
 │   └── CertReviewStatusEnum.java           # 证书复核状态枚举
 ├── mapper/                                  # 数据访问层
 │   ├── ShipCertMapper.java
 │   ├── OilBatchMapper.java
 │   ├── WorkWindowMapper.java
 │   ├── BerthPlanMapper.java
-│   └── BunkeringApplyMapper.java
+│   ├── BunkeringApplyMapper.java
+│   └── SignReceiptMapper.java              # 签收单数据访问（新增）
 ├── rule/                                    # 业务规则校验器
 │   ├── CertExpireValidator.java            # 证书过期校验
 │   ├── SulfurContentValidator.java         # 硫含量超标校验
@@ -63,15 +67,16 @@ src/main/java/com/maritime/bunkering/
     ├── OilBatchService.java                # 油品批次服务
     ├── ShipCertService.java                # 船舶证书服务
     ├── WorkWindowService.java              # 作业窗口服务
-    └── BerthPlanService.java               # 靠泊计划服务
+    ├── BerthPlanService.java               # 靠泊计划服务
+    └── SignReceiptService.java             # 签收单服务（新增）
 ```
 
 ## 状态机
 
 ```
-草稿(0) → 已提交(1) → 证书复核通过(2) → 油品检测通过(3) → 待确认(4) → 已确认(5)
-                  ↓               ↓                ↓                ↓
-               已拒绝(6)       已拒绝(6)        已拒绝(6)        已拒绝(6)
+草稿(0) → 已提交(1) → 证书复核通过(2) → 油品检测通过(3) → 待确认(4) → 已确认(5) → 待签收(9) → 已签收(10)
+                  ↓               ↓                ↓                ↓                ↓
+               已拒绝(6)       已拒绝(6)        已拒绝(6)        已拒绝(6)        签收拒绝(11)
 ```
 
 ## 快速开始
@@ -153,6 +158,25 @@ Content-Type: application/json
 | POST | `/cert/review` | 复核船舶证书 |
 | GET | `/ship/certs/{shipCode}` | 查询船舶证书列表 |
 | GET | `/apply/{id}` | 查询申请详情 |
+| POST | `/sign/submit` | 提交签收单 |
+| GET | `/sign/{id}` | 查询签收单详情 |
+| GET | `/sign/list` | 查询签收单列表 |
+
+**提交签收单示例**:
+
+```json
+POST /api/bunkering/supplier/sign/submit
+Content-Type: application/json
+
+{
+  "applyId": "APPLY005",
+  "actualQuantity": 498.50,
+  "signTime": "2024-06-10T11:30:00",
+  "signer": "张三",
+  "remark": "加注作业完成，实际量与计划量略有差异",
+  "operator": "supplier001"
+}
+```
 
 ### 港航监管接口 (`/api/bunkering/authority`)
 
@@ -163,6 +187,23 @@ Content-Type: application/json
 | GET | `/oil-batch/list` | 查询油品批次列表 |
 | GET | `/oil-batch/non-compliant` | 查询不合格油品 |
 | GET | `/oil-batch/check-sulfur/{id}` | 检查硫含量 |
+| GET | `/sign/check/{applyId}` | 查询签收核对结果 |
+| GET | `/sign/{id}` | 查询签收单详情 |
+| GET | `/sign/list` | 查询签收单列表 |
+| GET | `/sign/history/{applyId}` | 查询申请签收历史 |
+
+**查询签收核对结果示例**:
+
+```json
+GET /api/bunkering/authority/sign/check/APPLY005
+```
+
+返回数据包含：
+- 船舶证书列表及核对结果
+- 油品批次信息及硫含量检查结果
+- 作业窗口信息及靠泊冲突检查结果
+- 签收单信息（签收人、签收时间、实际加注量）
+- 状态变化记录（签收前状态、签收后状态）
 
 ### 基础数据接口 (`/api/bunkering/base`)
 
@@ -220,6 +261,198 @@ Content-Type: application/json
    - 确认: 返回 `code = 9`，提示"申请已拒绝，无法确认"
 
 **预期结果**: 所有验证步骤通过，硫含量超标拦截逻辑正确。
+
+---
+
+## 到港签收确认功能说明
+
+### 业务流程
+1. 供油企业完成加注作业后，提交签收单
+2. 系统自动校验：船舶证书有效性、油品硫含量、靠泊计划冲突
+3. 校验全部通过 → 签收成功，状态变更为"已签收"
+4. 任一校验不通过 → 签收拒绝，状态变更为"签收拒绝"，记录拒绝原因
+5. 港航监管可查看签收核对结果，包含三类校验的详细信息
+
+### 校验规则
+| 校验项 | 不通过条件 | 处理方式 |
+|--------|-----------|---------|
+| 船舶证书 | 证书过期或状态无效 | 签收拒绝 |
+| 油品硫含量 | 硫含量 > 0.5% | 签收拒绝 |
+| 靠泊计划 | 作业时间与靠泊计划冲突 | 签收拒绝 |
+
+### 状态变化记录
+签收单记录完整的状态变更轨迹：
+- `before_status`: 签收前状态（已确认/待签收）
+- `after_status`: 签收后状态（已签收/签收拒绝）
+- `cert_check_result`: 证书核对结果（1通过/2不通过）
+- `oil_check_result`: 油品核对结果（1通过/2不通过）
+- `window_check_result`: 窗口核对结果（1通过/2不通过）
+
+---
+
+### 验收路径1：成功签收
+
+**场景**: APPLY005 已确认，油品合格(BATCH001硫含量0.35%)，靠泊无冲突
+
+**步骤**:
+
+1. **查询申请详情，确认状态为已确认**
+   ```
+   GET /api/bunkering/supplier/apply/APPLY005
+   ```
+   确认: `applyStatus = 5`（已确认）, `sulfurCheckResult = 1`（合格）
+
+2. **供油企业提交签收单（成功）**
+   ```json
+   POST /api/bunkering/supplier/sign/submit
+   Content-Type: application/json
+
+   {
+     "applyId": "APPLY005",
+     "actualQuantity": 498.50,
+     "signTime": "2024-06-10T11:30:00",
+     "signer": "张三",
+     "remark": "加注作业完成，实际量与计划量略有差异",
+     "operator": "supplier001"
+   }
+   ```
+   **成功响应**:
+   ```json
+   {
+     "code": 0,
+     "message": "签收单提交成功",
+     "data": {
+       "id": "SIGNxxxxxx",
+       "receiptNo": "SRxxxxxx",
+       "applyId": "APPLY005",
+       "beforeStatus": 5,
+       "afterStatus": 10,
+       "certCheckResult": 1,
+       "oilCheckResult": 1,
+       "windowCheckResult": 1,
+       "receiptStatus": 1
+     }
+   }
+   ```
+
+3. **港航监管查询签收核对结果**
+   ```
+   GET /api/bunkering/authority/sign/check/APPLY005
+   ```
+   确认:
+   - `certCheckResult = 1`，证书均在有效期内
+   - `sulfurCheckResult.compliant = true`，硫含量0.35%合格
+   - `windowCheckResult.conflict = false`，无靠泊冲突
+   - `applyStatus = 10`（已签收）
+
+4. **查看签收历史记录**
+   ```
+   GET /api/bunkering/authority/sign/history/APPLY005
+   ```
+   确认: 包含完整的状态变化记录
+
+---
+
+### 验收路径2：硫含量超标导致签收拒绝
+
+**场景**: APPLY006 已确认，但油品BATCH003硫含量0.85%超标
+
+**步骤**:
+
+1. **确认油品硫含量超标**
+   ```
+   GET /api/bunkering/authority/oil-batch/check-sulfur/BATCH003
+   ```
+   确认: `compliant = false`，硫含量0.85% > 0.5%
+
+2. **供油企业提交签收单（硫含量超标拒绝）**
+   ```json
+   POST /api/bunkering/supplier/sign/submit
+   Content-Type: application/json
+
+   {
+     "applyId": "APPLY006",
+     "actualQuantity": 300.00,
+     "signTime": "2024-06-10T11:00:00",
+     "signer": "李四",
+     "remark": "加注完成，等待审核",
+     "operator": "supplier002"
+   }
+   ```
+   **拒绝响应**:
+   ```json
+   {
+     "code": 9,
+     "message": "油品硫含量超标，签收不通过。油品硫含量超标，拦截加注申请。批次号: FUEL20240603，硫含量: 0.85%，限值: 0.5%，超出: 0.35%，签收单已记录但未通过审核"
+   }
+   ```
+
+3. **查询申请状态，确认已变更为签收拒绝**
+   ```
+   GET /api/bunkering/supplier/apply/APPLY006
+   ```
+   确认: `applyStatus = 11`（签收拒绝）, `rejectReason` 包含硫含量超标信息
+
+4. **港航监管查看核对结果**
+   ```
+   GET /api/bunkering/authority/sign/check/APPLY006
+   ```
+   确认:
+   - `oilCheckResult = 2`，硫含量超标
+   - `sulfurCheckResult.compliant = false`
+   - `applyStatus = 11`（签收拒绝）
+
+---
+
+### 验收路径3：靠泊计划冲突导致签收拒绝
+
+**场景**: APPLY007 已确认，但作业时间与靠泊计划PLAN004冲突
+
+**步骤**:
+
+1. **确认靠泊计划冲突**
+   - APPLY007计划时间: 2024-06-11 08:00-12:00
+   - 靠泊计划PLAN004: 2024-06-11 08:00-12:00，船舶: SHIP001 远洋号
+
+2. **供油企业提交签收单（靠泊冲突拒绝）**
+   ```json
+   POST /api/bunkering/supplier/sign/submit
+   Content-Type: application/json
+
+   {
+     "applyId": "APPLY007",
+     "actualQuantity": 200.00,
+     "signTime": "2024-06-11T10:00:00",
+     "signer": "王五",
+     "remark": "加注完成",
+     "operator": "supplier001"
+   }
+   ```
+   **拒绝响应**:
+   ```json
+   {
+     "code": 9,
+     "message": "靠泊计划冲突，签收不通过。作业窗口与靠泊计划冲突。冲突计划: BP20240611001，船舶: 远洋号，作业类型: 加油，时间: 2024-06-11 08:00:00.0 至 2024-06-11 12:00:00.0，签收单已记录但未通过审核"
+   }
+   ```
+
+3. **查询申请状态，确认已变更为签收拒绝**
+   ```
+   GET /api/bunkering/supplier/apply/APPLY007
+   ```
+   确认: `applyStatus = 11`（签收拒绝）, `rejectReason` 包含靠泊冲突信息
+
+4. **查看签收历史，记录完整状态变化**
+   ```
+   GET /api/bunkering/authority/sign/history/APPLY007
+   ```
+   确认:
+   - `beforeStatus = 5`（已确认）
+   - `afterStatus = 11`（签收拒绝）
+   - `windowCheckResult = 2`，存在靠泊冲突
+   - `windowCheckMsg` 包含冲突详情
+
+---
 
 ## 统一响应格式
 
