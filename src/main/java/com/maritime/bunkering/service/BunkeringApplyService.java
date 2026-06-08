@@ -115,7 +115,7 @@ public class BunkeringApplyService {
         return apply;
     }
 
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, noRollbackFor = BusinessException.class)
     public BunkeringApply reviewCert(CertReviewDTO dto) {
         BunkeringApply apply = bunkeringApplyMapper.selectById(dto.getApplyId());
         if (apply == null) {
@@ -167,7 +167,7 @@ public class BunkeringApplyService {
         return apply;
     }
 
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, noRollbackFor = BusinessException.class)
     public BunkeringApply confirmApply(String applyId, String operator) {
         BunkeringApply apply = bunkeringApplyMapper.selectById(applyId);
         if (apply == null) {
@@ -251,5 +251,10 @@ public class BunkeringApplyService {
         wrapper.eq("deleted", 0);
         wrapper.orderByDesc("create_time");
         return bunkeringApplyMapper.selectPage(page, wrapper);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public boolean updateById(BunkeringApply apply) {
+        return bunkeringApplyMapper.updateById(apply) > 0;
     }
 }

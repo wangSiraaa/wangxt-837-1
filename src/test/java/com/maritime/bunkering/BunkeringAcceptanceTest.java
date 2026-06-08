@@ -193,4 +193,146 @@ class BunkeringAcceptanceTest {
         System.out.println("  状态: " + rejectedApply.getApplyStatus() + " (已拒绝)");
         System.out.println("  拒绝原因: " + rejectedApply.getRejectReason());
     }
+
+    @Test
+    @DisplayName("确认操作事务验证：硫含量超标时拒绝确认并持久化状态")
+    void testConfirmWithExceedSulfur_ShouldPersistRejectedStatus() {
+        BunkeringApplySubmitDTO dto = new BunkeringApplySubmitDTO();
+        dto.setShipCode("SHIP001");
+        dto.setShipName("远洋号");
+        dto.setAgentCode("AGENT001");
+        dto.setAgentName("上海外轮代理有限公司");
+        dto.setSupplierCode("SUPP001");
+        dto.setSupplierName("中石化燃料油销售有限公司");
+        dto.setOilBatchId("BATCH001");
+        dto.setOilType("燃料油");
+        dto.setOilQuantity(new BigDecimal("300.00"));
+        dto.setBerthCode("BERTH002");
+        dto.setWorkWindowId("WIN005");
+        dto.setPlanStartTime(toDate(LocalDateTime.of(2024, 6, 10, 13, 0, 0)));
+        dto.setPlanEndTime(toDate(LocalDateTime.of(2024, 6, 10, 17, 0, 0)));
+        dto.setCreateBy("agent001");
+
+        BunkeringApply apply = bunkeringApplyService.submitApply(dto);
+        assertNotNull(apply, "提交成功应返回申请对象");
+        assertEquals(ApplyStatusEnum.SUBMITTED.getCode(), apply.getApplyStatus(),
+                "提交后状态应为已提交(1)");
+
+        String applyId = apply.getId();
+
+        BunkeringApply updateApply = new BunkeringApply();
+        updateApply.setId(applyId);
+        updateApply.setApplyStatus(ApplyStatusEnum.OIL_CHECK_PASSED.getCode());
+        updateApply.setSulfurCheckResult(2);
+        updateApply.setUpdateBy("test");
+        bunkeringApplyService.updateById(updateApply);
+
+        BunkeringApply beforeConfirm = bunkeringApplyService.getById(applyId);
+        assertEquals(ApplyStatusEnum.OIL_CHECK_PASSED.getCode(), beforeConfirm.getApplyStatus(),
+                "确认前状态应为油品检测通过(3)");
+        assertEquals(Integer.valueOf(2), beforeConfirm.getSulfurCheckResult(),
+                "确认前硫含量检查结果应为不合格(2)");
+
+        try {
+            bunkeringApplyService.confirmApply(applyId, "admin");
+            fail("硫含量超标时确认应抛出异常");
+        } catch (Exception e) {
+            assertTrue(e.getMessage().contains("硫含量") || e.getMessage().contains("超标"),
+                    "异常信息应包含硫含量超标提示，实际: " + e.getMessage());
+        }
+
+        BunkeringApply afterConfirm = bunkeringApplyService.getById(applyId);
+        assertEquals(ApplyStatusEnum.REJECTED.getCode(), afterConfirm.getApplyStatus(),
+                "硫含量超标时确认后状态应持久化为已拒绝(6)，实际: " + afterConfirm.getApplyStatus());
+        assertEquals(Integer.valueOf(1), afterConfirm.getWindowConflictFlag(),
+                "windowConflictFlag应设置为1，实际: " + afterConfirm.getWindowConflictFlag());
+        assertNotNull(afterConfirm.getRejectReason(), "应写入rejectReason");
+        assertTrue(afterConfirm.getRejectReason().contains("硫含量") || afterConfirm.getRejectReason().contains("超标"),
+                "rejectReason应包含硫含量超标，实际: " + afterConfirm.getRejectReason());
+
+        System.out.println("========== 确认操作硫含量超标事务验证通过 ==========");
+        System.out.println("1. ✓ 确认前状态: " + beforeConfirm.getApplyStatus() + " (油品检测通过)");
+        System.out.println("2. ✓ 确认前硫含量检查结果: " + beforeConfirm.getSulfurCheckResult() + " (不合格)");
+        System.out.println("3. ✓ 确认抛出异常: " + "硫含量超标，拒绝确认");
+        System.out.println("4. ✓ 确认后状态: " + afterConfirm.getApplyStatus() + " (已拒绝) - 已持久化");
+        System.out.println("5. ✓ windowConflictFlag: " + afterConfirm.getWindowConflictFlag() + " - 已持久化");
+        System.out.println("6. ✓ rejectReason: " + afterConfirm.getRejectReason() + " - 已持久化");
+        System.out.println("=====================================================");
+    }
+
+    @Test
+    @DisplayName("确认操作事务验证：作业窗口冲突时拒绝确认并持久化状态")
+    void testConfirmWithWindowConflict_ShouldPersistRejectedStatus() {
+        BunkeringApplySubmitDTO dto = new BunkeringApplySubmitDTO();
+        dto.setShipCode("SHIP003");
+        dto.setShipName("测试船3号");
+        dto.setAgentCode("AGENT001");
+        dto.setAgentName("上海外轮代理有限公司");
+        dto.setSupplierCode("SUPP001");
+        dto.setSupplierName("中石化燃料油销售有限公司");
+        dto.setOilBatchId("BATCH001");
+        dto.setOilType("燃料油");
+        dto.setOilQuantity(new BigDecimal("200.00"));
+        dto.setBerthCode("BERTH001");
+        dto.setPlanStartTime(toDate(LocalDateTime.of(2024, 6, 11, 8, 0, 0)));
+        dto.setPlanEndTime(toDate(LocalDateTime.of(2024, 6, 11, 12, 0, 0)));
+        dto.setCreateBy("agent001");
+
+        BunkeringApply apply = null;
+        try {
+            apply = bunkeringApplyService.submitApply(dto);
+            fail("窗口冲突时提交应被拒绝");
+        } catch (Exception e) {
+            assertTrue(e.getMessage().contains("冲突") || e.getMessage().contains("靠泊"),
+                    "异常信息应包含窗口冲突提示，实际: " + e.getMessage());
+        }
+
+        java.util.List<BunkeringApply> applies = bunkeringApplyService.queryPage(1, 10, "SHIP003", null).getRecords();
+        BunkeringApply submittedApply = applies.stream()
+                .filter(a -> "SHIP003".equals(a.getShipCode()))
+                .findFirst()
+                .orElse(null);
+        assertNotNull(submittedApply, "应能查询到申请");
+
+        String applyId = submittedApply.getId();
+
+        BunkeringApply updateApply = new BunkeringApply();
+        updateApply.setId(applyId);
+        updateApply.setApplyStatus(ApplyStatusEnum.OIL_CHECK_PASSED.getCode());
+        updateApply.setSulfurCheckResult(1);
+        updateApply.setRejectReason(null);
+        updateApply.setWindowConflictFlag(0);
+        updateApply.setUpdateBy("test");
+        bunkeringApplyService.updateById(updateApply);
+
+        BunkeringApply beforeConfirm = bunkeringApplyService.getById(applyId);
+        assertEquals(ApplyStatusEnum.OIL_CHECK_PASSED.getCode(), beforeConfirm.getApplyStatus(),
+                "确认前状态应为油品检测通过(3)");
+
+        try {
+            bunkeringApplyService.confirmApply(applyId, "admin");
+            fail("窗口冲突时确认应抛出异常");
+        } catch (Exception e) {
+            assertTrue(e.getMessage().contains("冲突") || e.getMessage().contains("靠泊"),
+                    "异常信息应包含窗口冲突提示，实际: " + e.getMessage());
+        }
+
+        BunkeringApply afterConfirm = bunkeringApplyService.getById(applyId);
+        assertEquals(ApplyStatusEnum.REJECTED.getCode(), afterConfirm.getApplyStatus(),
+                "窗口冲突时确认后状态应持久化为已拒绝(6)，实际: " + afterConfirm.getApplyStatus());
+        assertEquals(Integer.valueOf(1), afterConfirm.getWindowConflictFlag(),
+                "windowConflictFlag应设置为1，实际: " + afterConfirm.getWindowConflictFlag());
+        assertNotNull(afterConfirm.getRejectReason(), "应写入rejectReason");
+        assertTrue(afterConfirm.getRejectReason().contains("冲突") || afterConfirm.getRejectReason().contains("靠泊"),
+                "rejectReason应包含窗口冲突，实际: " + afterConfirm.getRejectReason());
+
+        System.out.println("========== 确认操作窗口冲突事务验证通过 ==========");
+        System.out.println("1. ✓ 确认前状态: " + beforeConfirm.getApplyStatus() + " (油品检测通过)");
+        System.out.println("2. ✓ 确认抛出异常: 作业窗口与靠泊计划冲突");
+        System.out.println("3. ✓ 确认后状态: " + afterConfirm.getApplyStatus() + " (已拒绝) - 已持久化");
+        System.out.println("4. ✓ windowConflictFlag: " + afterConfirm.getWindowConflictFlag() + " - 已持久化");
+        System.out.println("5. ✓ rejectReason: " + afterConfirm.getRejectReason() + " - 已持久化");
+        System.out.println("====================================================");
+    }
+
 }

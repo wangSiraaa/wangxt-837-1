@@ -37,3 +37,13 @@ INSERT INTO berth_plan (id, plan_no, berth_code, berth_name, ship_code, ship_nam
 INSERT INTO bunkering_apply (id, apply_no, ship_code, ship_name, agent_code, agent_name, supplier_code, supplier_name, oil_batch_id, oil_type, oil_quantity, berth_code, work_window_id, plan_start_time, plan_end_time, cert_review_status, cert_review_comment, cert_review_time, cert_reviewer, apply_status, reject_reason, confirm_time, sulfur_check_result, window_conflict_flag, create_by, update_by) VALUES
 ('APPLY001', 'BA202406001', 'SHIP001', '远洋号', 'AGENT001', '上海外轮代理有限公司', 'SUPP001', '中石化燃料油销售有限公司', 'BATCH001', '燃料油', 500.00, 'BERTH001', 'WIN001', '2024-06-10 08:00:00', '2024-06-10 12:00:00', 1, '证书有效，复核通过', '2024-06-09 10:00:00', 'reviewer001', 5, NULL, '2024-06-09 14:00:00', 1, 0, 'admin', 'admin'),
 ('APPLY002', 'BA202406002', 'SHIP002', '江河号', 'AGENT001', '上海外轮代理有限公司', 'SUPP001', '中石化燃料油销售有限公司', 'BATCH002', '柴油', 200.00, 'BERTH001', 'WIN002', '2024-06-10 13:00:00', '2024-06-10 17:00:00', 2, '船舶检验证书已过期', '2024-06-09 11:00:00', 'reviewer001', 6, '船舶检验证书已过期，证书有效期至2024-03-14', NULL, 1, 0, 'admin', 'admin');
+
+-- 确认操作事务验证测试数据
+-- APPLY003: 硫含量检查结果为不合格(2)，状态为油品检测通过(3)，用于验证硫含量超标时确认操作的事务处理
+INSERT INTO bunkering_apply (id, apply_no, ship_code, ship_name, agent_code, agent_name, supplier_code, supplier_name, oil_batch_id, oil_type, oil_quantity, berth_code, work_window_id, plan_start_time, plan_end_time, cert_review_status, cert_review_comment, cert_review_time, cert_reviewer, apply_status, reject_reason, confirm_time, sulfur_check_result, window_conflict_flag, create_by, update_by) VALUES
+('APPLY003', 'BA202406003', 'SHIP001', '远洋号', 'AGENT001', '上海外轮代理有限公司', 'SUPP001', '中石化燃料油销售有限公司', 'BATCH003', '燃料油', 300.00, 'BERTH002', 'WIN005', '2024-06-10 13:00:00', '2024-06-10 17:00:00', 1, '证书有效，复核通过', '2024-06-10 09:00:00', 'reviewer001', 3, NULL, NULL, 2, 0, 'admin', 'admin');
+
+-- APPLY004: 作业窗口与靠泊计划冲突，状态为油品检测通过(3)，用于验证窗口冲突时确认操作的事务处理
+-- 窗口冲突：计划时间 2024-06-11 08:00-12:00 与靠泊计划 PLAN004 冲突
+INSERT INTO bunkering_apply (id, apply_no, ship_code, ship_name, agent_code, agent_name, supplier_code, supplier_name, oil_batch_id, oil_type, oil_quantity, berth_code, work_window_id, plan_start_time, plan_end_time, cert_review_status, cert_review_comment, cert_review_time, cert_reviewer, apply_status, reject_reason, confirm_time, sulfur_check_result, window_conflict_flag, create_by, update_by) VALUES
+('APPLY004', 'BA202406004', 'SHIP003', '致远号', 'AGENT001', '上海外轮代理有限公司', 'SUPP001', '中石化燃料油销售有限公司', 'BATCH001', '燃料油', 200.00, 'BERTH001', 'WIN006', '2024-06-11 08:00:00', '2024-06-11 12:00:00', 1, '证书有效，复核通过', '2024-06-10 10:00:00', 'reviewer001', 3, NULL, NULL, 1, 0, 'admin', 'admin');
